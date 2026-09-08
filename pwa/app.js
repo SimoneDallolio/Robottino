@@ -48,6 +48,7 @@ async function connectToRobot() {
     $('welcomeScreen').hidden = true;
     $('appHeader').hidden = false;
     $('accessPanel').hidden = false;
+    $('appFooter').hidden = false;
     $('firstBootPanel').hidden = !state.firstBoot;
     showFeedback('accessFeedback', state.firstBoot
       ? 'Primo avvio: il PIN iniziale è 0000 e devi sostituirlo.'
@@ -112,6 +113,7 @@ async function verifyAccess() {
 
   $('accessPanel').hidden = true;
   $('setupContent').hidden = false;
+  $('appHeader').scrollIntoView({ behavior: 'smooth', block: 'start' });
   showFeedback('feedback', state.firstBoot ? 'PIN iniziale verificato: completa la nuova configurazione.' : 'Accesso verificato.');
 }
 
