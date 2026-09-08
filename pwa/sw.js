@@ -1,4 +1,4 @@
-const CACHE = 'robottino-ble-v1';
+const CACHE = 'robottino-ble-v2';
 const ASSETS = ['./', './index.html', './style.css', './app.js', './manifest.json'];
 
 self.addEventListener('install', (event) => {
