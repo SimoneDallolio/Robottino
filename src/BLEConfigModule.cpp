@@ -23,7 +23,7 @@ namespace {
       bool accepted = networkManagerApplyBlePayload(payload);
       bleConfigNotify(accepted
         ? "{\"ok\":true,\"message\":\"configurazione salvata\"}"
-        : "{\"ok\":false,\"error\":\"PIN o dati non validi\"}");
+        : String("{\"ok\":false,\"error\":\"") + networkManagerLastConfigError() + "\"}" );
     }
   };
 

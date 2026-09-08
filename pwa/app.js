@@ -22,8 +22,6 @@ function showFeedback(elementId, message, error = false) {
 }
 
 function setConnected(connected) {
-  $('connectionDot').classList.toggle('connected', connected);
-  $('connectionDot').setAttribute('aria-label', connected ? 'Connesso' : 'Non connesso');
 }
 
 async function connectToRobot() {
@@ -49,6 +47,7 @@ async function connectToRobot() {
     $('appHeader').hidden = false;
     $('accessPanel').hidden = false;
     $('appFooter').hidden = false;
+    document.body.classList.add('app-mode', 'access-mode');
     $('firstBootPanel').hidden = !state.firstBoot;
     showFeedback('accessFeedback', state.firstBoot
       ? 'Primo avvio: il PIN iniziale è 0000 e devi sostituirlo.'
@@ -113,6 +112,8 @@ async function verifyAccess() {
 
   $('accessPanel').hidden = true;
   $('setupContent').hidden = false;
+  document.body.classList.remove('access-mode');
+  document.body.classList.add('setup-mode');
   $('appHeader').scrollIntoView({ behavior: 'smooth', block: 'start' });
   showFeedback('feedback', state.firstBoot ? 'PIN iniziale verificato: completa la nuova configurazione.' : 'Accesso verificato.');
 }

@@ -20,6 +20,7 @@ namespace {
   String bleName;
   bool bleActive = false;
   bool configUpdatePending = false;
+  String lastConfigError;
 
   bool isValidPin(const String& pin) {
     if (pin.length() != 4) return false;
@@ -41,6 +42,30 @@ namespace {
 
   bool hasWifiCredentials() {
     return preferences.isKey("ssid") && preferences.getString("ssid").length() > 0;
+  }
+
+  bool testWifiCredentials(const String& ssid, const String& password) {
+    Serial.printf("[BLE] Verifica rete Wi-Fi: %s\n", ssid.c_str());
+    WiFi.mode(WIFI_STA);
+    WiFi.setSleep(true);
+    WiFi.setAutoReconnect(false);
+    WiFi.persistent(false);
+    WiFi.begin(ssid.c_str(), password.c_str());
+
+    uint32_t startedAt = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - startedAt < CONNECT_TIMEOUT_MS) {
+      delay(100);
+    }
+
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("[BLE] Credenziali Wi-Fi rifiutate o rete non raggiungibile");
+      WiFi.disconnect(true);
+      WiFi.mode(WIFI_OFF);
+      return false;
+    }
+
+    Serial.printf("[BLE] Rete verificata, IP: %s\n", WiFi.localIP().toString().c_str());
+    return true;
   }
 }
 
@@ -126,9 +151,11 @@ bool networkManagerTakeConfigUpdate() {
 }
 
 bool networkManagerApplyBlePayload(const String& payload) {
+  lastConfigError = "";
   StaticJsonDocument<768> document;
   DeserializationError error = deserializeJson(document, payload);
   if (error) {
+    lastConfigError = "JSON non valido";
     Serial.printf("[BLE] JSON non valido: %s\n", error.c_str());
     return false;
   }
@@ -153,7 +180,14 @@ bool networkManagerApplyBlePayload(const String& payload) {
   if (!pinAccepted || (firstBoot && !isValidPin(newPin)) || ssid.isEmpty() || ssid.length() > 32 || password.length() > 63 ||
       latitude < MIN_LATITUDE || latitude > MAX_LATITUDE ||
       longitude < MIN_LONGITUDE || longitude > MAX_LONGITUDE || epoch < 1000000000ULL) {
+    lastConfigError = "PIN o dati non validi";
     Serial.println("[BLE] Configurazione rifiutata: PIN o dati non validi");
+    return false;
+  }
+
+  // Verifica la rete prima di scrivere in NVS o spegnere il BLE.
+  if (!testWifiCredentials(ssid, password)) {
+    lastConfigError = "SSID o password Wi-Fi errati";
     return false;
   }
 
@@ -170,6 +204,10 @@ bool networkManagerApplyBlePayload(const String& payload) {
 
   configUpdatePending = true;
   return true;
+}
+
+String networkManagerLastConfigError() {
+  return lastConfigError;
 }
 
 String networkManagerProvisioningStatus() {
