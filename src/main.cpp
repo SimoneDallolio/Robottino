@@ -22,6 +22,40 @@ unsigned long lastActivityTime = 0;
 unsigned long sleepAnimationStart = 0;
 unsigned long wakeAnimationStart = 0;
 
+enum StartupState {
+  STARTUP_CONNECTING,
+  STARTUP_LOADING,
+  STARTUP_CONFIGURE,
+  STARTUP_READY
+};
+
+StartupState startupState = STARTUP_CONNECTING;
+
+void renderStartupScreen() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  if (startupState == STARTUP_CONNECTING) {
+    display.setCursor(18, 24);
+    display.print("Connessione WiFi...");
+  } else if (startupState == STARTUP_LOADING) {
+    display.setCursor(25, 20);
+    display.print("Avvio in corso");
+    display.setCursor(35, 38);
+    display.print("Attendere...");
+  } else if (startupState == STARTUP_CONFIGURE) {
+    display.setCursor(8, 12);
+    display.print(networkManagerDeviceName());
+    display.setCursor(7, 29);
+    display.print("Configura il robot");
+    display.setCursor(13, 43);
+    display.print("dall'app BLE");
+  }
+
+  display.display();
+}
+
 void updateDisplay() {
   // Ogni fotogramma viene preparato in memoria e poi trasferito all'OLED in
   // un'unica operazione, evitando residui del fotogramma precedente.
@@ -57,18 +91,24 @@ void setup() {
     for (;;);
   }
 
-  // Mostra un messaggio mentre il modulo orologio cerca la rete Wi-Fi.
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(15, 28);
-  display.print("Connessione WiFi...");
-  display.display();
+  // Mostra lo stato di avvio prima di iniziare il collegamento.
+  renderStartupScreen();
 
   // Carica identita, reti NVS e portale di configurazione.
   networkManagerBegin();
-  // Sincronizza ora e temperatura, poi spegne il Wi-Fi.
-  initTimeNTP();
+  if (networkManagerIsBleActive()) {
+    startupState = STARTUP_CONFIGURE;
+    renderStartupScreen();
+  } else {
+    startupState = STARTUP_LOADING;
+    renderStartupScreen();
+    // Sincronizza ora e temperatura, poi spegne il Wi-Fi.
+    if (initTimeNTP()) {
+      startupState = STARTUP_READY;
+    } else {
+      startupState = STARTUP_CONFIGURE;
+    }
+  }
 
   display.clearDisplay();
   display.display();
@@ -85,7 +125,13 @@ void loop() {
 
   if (networkManagerTakeConfigUpdate()) {
     networkManagerStopBle();
-    initTimeNTP();
+    startupState = STARTUP_LOADING;
+    renderStartupScreen();
+    if (initTimeNTP()) {
+      startupState = STARTUP_READY;
+    } else {
+      startupState = STARTUP_CONFIGURE;
+    }
   }
 
   // Una pressione sveglia il robot oppure alterna tra volto e orologio.
@@ -116,6 +162,10 @@ void loop() {
 
   // Ridisegna continuamente la schermata per mantenere vive le animazioni.
   clockModuleLoop();
-  updateDisplay();
+  if (startupState == STARTUP_READY) {
+    updateDisplay();
+  } else {
+    renderStartupScreen();
+  }
   delay(20);
 }

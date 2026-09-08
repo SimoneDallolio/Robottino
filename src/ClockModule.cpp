@@ -63,11 +63,11 @@ static bool getWeatherForCoordinates(float latitude, float longitude) {
   return true;
 }
 
-static void syncTimeAndWeather() {
+static bool syncTimeAndWeather() {
   if (!networkManagerConnectForSync()) {
     Serial.println("[NTP] Nessuna rete disponibile per il refresh");
     lastEcoSync = millis();
-    return;
+    return false;
   }
 
   Serial.printf("[NTP] Wi-Fi connesso, IP locale: %s\n", WiFi.localIP().toString().c_str());
@@ -92,16 +92,18 @@ static void syncTimeAndWeather() {
     float longitude;
     networkManagerGetLocation(latitude, longitude);
     Serial.printf("[METEO] Coordinate NVS: lat %.4f, lon %.4f\n", latitude, longitude);
-    if (!getWeatherForCoordinates(latitude, longitude)) {
+    bool weatherUpdated = getWeatherForCoordinates(latitude, longitude);
+    if (!weatherUpdated) {
       Serial.println("[METEO] Recupero dati fallito: verra mostrato -- C");
     }
 
   networkManagerStopWifi();
   lastEcoSync = millis();
+  return syncAttempts < 10 && weatherUpdated;
 }
 
-void initTimeNTP() {
-  syncTimeAndWeather();
+bool initTimeNTP() {
+  return syncTimeAndWeather();
 }
 
 void clockModuleLoop() {

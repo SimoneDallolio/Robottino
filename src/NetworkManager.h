@@ -10,6 +10,7 @@ void networkManagerStopWifi();
 bool networkManagerConnectForSync();
 bool networkManagerIsBleActive();
 bool networkManagerTakeConfigUpdate();
+String networkManagerDeviceName();
 
 bool networkManagerApplyBlePayload(const String& payload);
 String networkManagerProvisioningStatus();

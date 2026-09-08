@@ -115,6 +115,10 @@ bool networkManagerIsBleActive() {
   return bleActive;
 }
 
+String networkManagerDeviceName() {
+  return bleName;
+}
+
 bool networkManagerTakeConfigUpdate() {
   bool pending = configUpdatePending;
   configUpdatePending = false;
