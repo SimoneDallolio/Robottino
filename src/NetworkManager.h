@@ -12,4 +12,5 @@ bool networkManagerIsBleActive();
 bool networkManagerTakeConfigUpdate();
 
 bool networkManagerApplyBlePayload(const String& payload);
+String networkManagerProvisioningStatus();
 bool networkManagerGetLocation(float& latitude, float& longitude);

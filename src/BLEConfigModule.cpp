@@ -9,6 +9,7 @@
 namespace {
   BLEServer* server = nullptr;
   BLECharacteristic* configCharacteristic = nullptr;
+  BLECharacteristic* statusCharacteristic = nullptr;
   bool active = false;
 
   class ConfigCallbacks final : public BLECharacteristicCallbacks {
@@ -27,6 +28,15 @@ namespace {
   };
 
   ConfigCallbacks callbacks;
+
+  class StatusCallbacks final : public BLECharacteristicCallbacks {
+    void onRead(BLECharacteristic* characteristic) override {
+      String status = networkManagerProvisioningStatus();
+      characteristic->setValue(status.c_str());
+    }
+  };
+
+  StatusCallbacks statusCallbacks;
 }
 
 void bleConfigBegin(const String& deviceName) {
@@ -41,6 +51,12 @@ void bleConfigBegin(const String& deviceName) {
   );
   configCharacteristic->addDescriptor(new BLE2902());
   configCharacteristic->setCallbacks(&callbacks);
+  statusCharacteristic = service->createCharacteristic(
+    BLE_STATUS_CHARACTERISTIC_UUID,
+    BLECharacteristic::PROPERTY_READ
+  );
+  statusCharacteristic->setCallbacks(&statusCallbacks);
+  statusCharacteristic->setValue(networkManagerProvisioningStatus().c_str());
   service->start();
 
   BLEAdvertising* advertising = BLEDevice::getAdvertising();
@@ -60,6 +76,7 @@ void bleConfigStop() {
   BLEDevice::deinit(true);
   server = nullptr;
   configCharacteristic = nullptr;
+  statusCharacteristic = nullptr;
   active = false;
   Serial.println("[BLE] BLE disattivato");
 }

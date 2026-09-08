@@ -8,7 +8,7 @@
 
 namespace {
   constexpr uint32_t CONNECT_TIMEOUT_MS = 12000;
-  constexpr char DEFAULT_PIN[] = "1234";
+  constexpr char DEFAULT_PIN[] = "0000";
   constexpr float DEFAULT_LATITUDE = 44.6471f;
   constexpr float DEFAULT_LONGITUDE = 10.9252f;
   constexpr float MIN_LATITUDE = -90.0f;
@@ -129,14 +129,24 @@ bool networkManagerApplyBlePayload(const String& payload) {
     return false;
   }
 
+  String action = document["action"] | "";
+  if (action == "auth") {
+    bool accepted = verifyPin(document["pin"] | "");
+    Serial.printf("[BLE] Verifica PIN: %s\n", accepted ? "OK" : "rifiutata");
+    return accepted;
+  }
+
   String pin = document["pin"] | "";
   String ssid = document["ssid"] | "";
   String password = document["pass"] | "";
+  String newPin = document["newPin"] | "";
   unsigned long long epoch = document["time"] | 0ULL;
   float latitude = document["lat"] | NAN;
   float longitude = document["lon"] | NAN;
 
-  if (!verifyPin(pin) || ssid.isEmpty() || ssid.length() > 32 || password.length() > 63 ||
+  bool firstBoot = !preferences.isKey("configured");
+  bool pinAccepted = firstBoot ? pin == DEFAULT_PIN : verifyPin(pin);
+  if (!pinAccepted || (firstBoot && !isValidPin(newPin)) || ssid.isEmpty() || ssid.length() > 32 || password.length() > 63 ||
       latitude < MIN_LATITUDE || latitude > MAX_LATITUDE ||
       longitude < MIN_LONGITUDE || longitude > MAX_LONGITUDE || epoch < 1000000000ULL) {
     Serial.println("[BLE] Configurazione rifiutata: PIN o dati non validi");
@@ -150,10 +160,20 @@ bool networkManagerApplyBlePayload(const String& payload) {
   preferences.putString("pass", password);
   preferences.putFloat("lat", latitude);
   preferences.putFloat("lon", longitude);
+  if (firstBoot) preferences.putString("pin", newPin);
+  preferences.putBool("configured", true);
   Serial.printf("[BLE] Configurazione salvata per %s\n", ssid.c_str());
 
   configUpdatePending = true;
   return true;
+}
+
+String networkManagerProvisioningStatus() {
+  StaticJsonDocument<256> document;
+  document["firstBoot"] = !preferences.isKey("configured");
+  String status;
+  serializeJson(document, status);
+  return status;
 }
 
 bool networkManagerGetLocation(float& latitude, float& longitude) {

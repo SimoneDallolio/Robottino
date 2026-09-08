@@ -11,7 +11,14 @@
 </head>
 <body>
   <main class="shell">
-    <header class="hero">
+    <section class="welcome" id="welcomeScreen">
+      <span class="eyebrow">CONFIGURAZIONE SICURA</span>
+      <h1>Benvenuto.</h1>
+      <p>Seleziona il tuo Robottino e inserisci il PIN per iniziare.</p>
+      <button class="button primary" id="connectButton">Seleziona Robottino</button>
+      <p class="feedback" id="welcomeFeedback" role="status"></p>
+    </section>
+    <header class="hero" id="appHeader" hidden>
       <div>
         <span class="eyebrow">CONFIGURAZIONE BLE</span>
         <h1>Robottino</h1>
@@ -20,13 +27,23 @@
       <div class="status-dot" id="connectionDot" aria-label="Non connesso"></div>
     </header>
 
-    <section class="panel">
+    <section class="panel access-panel" id="accessPanel">
       <div class="panel-heading"><span>01</span><h2>Accesso</h2></div>
       <label for="pin">PIN del robottino</label>
-      <input id="pin" type="password" inputmode="numeric" maxlength="4" placeholder="1234" autocomplete="off">
+      <input id="pin" type="password" inputmode="numeric" maxlength="4" placeholder="0000" autocomplete="off">
       <p class="hint">Il PIN viene verificato direttamente dall'ESP32.</p>
+      <div class="first-boot" id="firstBootPanel" hidden>
+        <strong>Primo avvio rilevato</strong>
+        <p>Per proteggere il Robottino devi sostituire il PIN iniziale `0000`.</p>
+        <label for="newPin">Nuovo PIN a 4 cifre</label>
+        <input id="newPin" type="password" inputmode="numeric" maxlength="4" placeholder="Nuovo PIN" autocomplete="new-password">
+        <p class="hint">Il nuovo PIN sarà richiesto ai prossimi accessi.</p>
+      </div>
+      <button class="button primary" id="unlockButton">Continua</button>
+      <p class="feedback" id="accessFeedback" role="status"></p>
     </section>
 
+    <section class="setup-content" id="setupContent" hidden>
     <section class="panel">
       <div class="panel-heading"><span>02</span><h2>Rete Wi-Fi</h2></div>
       <label for="ssid">SSID</label>
@@ -49,8 +66,9 @@
       </div>
     </section>
 
-    <button class="button primary" id="sendButton">Connetti e invia configurazione</button>
+    <button class="button primary" id="sendButton">Invia configurazione</button>
     <p class="feedback" id="feedback" role="status"></p>
+    </section>
     <p class="footer">Servizio BLE: <code>7f7b0001-8b3a-4f65-9d39-2c8c5a7e1001</code></p>
   </main>
   <script src="app.js"></script>
