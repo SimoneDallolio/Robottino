@@ -24,6 +24,18 @@ function showFeedback(elementId, message, error = false) {
 function setConnected(connected) {
 }
 
+async function connectGatt() {
+  if (!state.device) throw new Error('Nessun Robottino selezionato.');
+  const server = state.device.gatt.connected
+    ? state.device.gatt
+    : await state.device.gatt.connect();
+  const service = await server.getPrimaryService(SERVICE_UUID);
+  state.characteristic = await service.getCharacteristic(CONFIG_UUID);
+  state.statusCharacteristic = await service.getCharacteristic(STATUS_UUID);
+  await state.characteristic.startNotifications();
+  state.characteristic.addEventListener('characteristicvaluechanged', handleResponse);
+}
+
 async function connectToRobot() {
   try {
     if (!('bluetooth' in navigator)) throw new Error('Web Bluetooth non supportato da questo browser.');
@@ -33,12 +45,7 @@ async function connectToRobot() {
       optionalServices: [SERVICE_UUID]
     });
     state.device.addEventListener('gattserverdisconnected', () => setConnected(false));
-    const server = await state.device.gatt.connect();
-    const service = await server.getPrimaryService(SERVICE_UUID);
-    state.characteristic = await service.getCharacteristic(CONFIG_UUID);
-    state.statusCharacteristic = await service.getCharacteristic(STATUS_UUID);
-    await state.characteristic.startNotifications();
-    state.characteristic.addEventListener('characteristicvaluechanged', handleResponse);
+    await connectGatt();
     const statusBytes = await state.statusCharacteristic.readValue();
     const status = JSON.parse(new TextDecoder().decode(statusBytes));
     state.firstBoot = status.firstBoot === true;
@@ -78,11 +85,22 @@ function handleResponse(event) {
   }
 }
 
+async function writePayload(payload) {
+  const bytes = new TextEncoder().encode(JSON.stringify(payload));
+  try {
+    await state.characteristic.writeValueWithResponse(bytes);
+  } catch (error) {
+    if (!state.device || state.device.gatt.connected) throw error;
+    await connectGatt();
+    await state.characteristic.writeValueWithResponse(bytes);
+  }
+}
+
 function writeAndWait(payload) {
   return new Promise(async (resolve, reject) => {
     state.responseWaiter = resolve;
     try {
-      await state.characteristic.writeValueWithResponse(new TextEncoder().encode(JSON.stringify(payload)));
+      await writePayload(payload);
       setTimeout(() => {
         if (!state.responseWaiter) return;
         state.responseWaiter = null;
@@ -147,8 +165,7 @@ async function sendConfiguration() {
       lat: state.latitude,
       lon: state.longitude
     };
-    const bytes = new TextEncoder().encode(JSON.stringify(payload));
-    await state.characteristic.writeValueWithResponse(bytes);
+    await writePayload(payload);
     showFeedback('feedback', 'Configurazione inviata, attendo conferma...');
   } catch (error) {
     showFeedback('feedback', error.message || 'Errore BLE.', true);
