@@ -17,11 +17,10 @@ const state = {
 
 function showFeedback(elementId, message, error = false) {
   const element = $(elementId);
+  // La schermata di configurazione non usa piu' un messaggio verde generale.
+  if (!element) return;
   element.textContent = message;
   element.classList.toggle('error', error);
-}
-
-function setConnected(connected) {
 }
 
 async function connectGatt() {
@@ -44,12 +43,10 @@ async function connectToRobot() {
       filters: [{ namePrefix: 'Robottino-' }],
       optionalServices: [SERVICE_UUID]
     });
-    state.device.addEventListener('gattserverdisconnected', () => setConnected(false));
     await connectGatt();
     const statusBytes = await state.statusCharacteristic.readValue();
     const status = JSON.parse(new TextDecoder().decode(statusBytes));
     state.firstBoot = status.firstBoot === true;
-    setConnected(true);
     $('welcomeScreen').hidden = true;
     $('appHeader').hidden = false;
     $('accessPanel').hidden = false;
@@ -68,6 +65,17 @@ function handleResponse(event) {
   const message = new TextDecoder().decode(event.target.value);
   try {
     const result = JSON.parse(message);
+    // I log devono finire sempre nella loro card, anche se la risposta arriva
+    // dopo il timeout di una precedente operazione Wi-Fi.
+    if (Array.isArray(result.logs)) {
+      $('serialLog').textContent = result.logs.join('\n') || 'Nessun messaggio ricevuto.';
+      if (state.responseWaiter) {
+        const waiter = state.responseWaiter;
+        state.responseWaiter = null;
+        waiter(result);
+      }
+      return;
+    }
     if (state.responseWaiter) {
       const waiter = state.responseWaiter;
       state.responseWaiter = null;
@@ -96,7 +104,7 @@ async function writePayload(payload) {
   }
 }
 
-function writeAndWait(payload) {
+function writeAndWait(payload, timeoutMs = 3000) {
   return new Promise(async (resolve, reject) => {
     state.responseWaiter = resolve;
     try {
@@ -105,12 +113,104 @@ function writeAndWait(payload) {
         if (!state.responseWaiter) return;
         state.responseWaiter = null;
         reject(new Error('Nessuna risposta dal Robottino.'));
-      }, 3000);
+      }, timeoutMs);
     } catch (error) {
       state.responseWaiter = null;
       reject(error);
     }
   });
+}
+
+async function requestRobot(action, details = {}, timeoutMs = 3000) {
+  const result = await writeAndWait({ action, ...details }, timeoutMs);
+  if (!result.ok) throw new Error(result.error || 'Il Robottino non ha completato la richiesta.');
+  return result;
+}
+
+function renderNetworks(elementId, networks, nearby = false) {
+  const container = $(elementId);
+  container.replaceChildren();
+  if (!networks.length) {
+    container.textContent = nearby ? 'Nessuna rete trovata.' : 'Nessuna rete salvata.';
+    return;
+  }
+  networks.forEach((network) => {
+    const ssid = typeof network === 'string' ? network : network.ssid;
+    if (!ssid) return;
+    const button = document.createElement('button');
+    button.className = 'network-item';
+    button.type = 'button';
+    button.textContent = nearby ? `${ssid}  (${network.rssi} dBm${network.secure ? ', protetta' : ''})` : ssid;
+    button.addEventListener('click', () => {
+      $('ssid').value = ssid;
+      showFeedback('feedback', `Rete selezionata: ${ssid}`);
+    });
+    if (nearby) {
+      container.append(button);
+      return;
+    }
+    const row = document.createElement('div');
+    row.className = 'saved-network-row';
+    const remove = document.createElement('button');
+    remove.className = 'remove-network';
+    remove.type = 'button';
+    remove.textContent = 'Elimina';
+    remove.addEventListener('click', () => deleteSavedNetwork(ssid));
+    row.append(button, remove);
+    container.append(row);
+  });
+}
+
+async function loadSavedNetworks() {
+  const result = await requestRobot('savedNetworks');
+  renderNetworks('savedNetworks', result.networks || []);
+}
+
+async function deleteSavedNetwork(ssid) {
+  try {
+    await requestRobot('deleteWifi', { pin: state.pin, ssid });
+    showFeedback('feedback', `Rete eliminata: ${ssid}`);
+    await loadSavedNetworks();
+  } catch (error) { showFeedback('feedback', error.message, true); }
+}
+
+async function scanWifi() {
+  try {
+    showFeedback('feedback', 'Scansione Wi-Fi in corso...');
+    const result = await requestRobot('scanWifi');
+    renderNetworks('nearbyNetworks', result.networks || [], true);
+    showFeedback('feedback', 'Seleziona una rete dall’elenco.');
+  } catch (error) { showFeedback('feedback', error.message, true); }
+}
+
+async function retryWifi() {
+  try {
+    // Il firmware prova ogni rete fino a tre volte: questa operazione puo'
+    // richiedere alcuni minuti senza che la connessione BLE sia guasta.
+    const result = await requestRobot('retryWifi', {}, 300000);
+    showFeedback('feedback', result.message || 'Connessione Wi-Fi riuscita.');
+    await loadLogs();
+  } catch (error) { showFeedback('feedback', error.message, true); await loadLogs(); }
+}
+
+async function loadLogs() {
+  try {
+    const result = await requestRobot('logs');
+    $('serialLog').textContent = (result.logs || []).join('\n') || 'Nessun messaggio ricevuto.';
+  } catch (error) { $('serialLog').textContent = `Impossibile leggere i messaggi: ${error.message}`; }
+}
+
+async function stopBle() {
+  try {
+    const result = await requestRobot('stopBle');
+    showFeedback('feedback', result.message || 'BLE disattivato.');
+    setTimeout(() => {
+      $('setupContent').hidden = true;
+      $('appHeader').hidden = true;
+      $('appFooter').hidden = true;
+      $('welcomeScreen').hidden = false;
+    }, 600);
+  } catch (error) { showFeedback('feedback', error.message, true); }
 }
 
 async function verifyAccess() {
@@ -134,6 +234,8 @@ async function verifyAccess() {
   document.body.classList.add('setup-mode');
   $('appHeader').scrollIntoView({ behavior: 'smooth', block: 'start' });
   showFeedback('feedback', state.firstBoot ? 'PIN iniziale verificato: completa la nuova configurazione.' : 'Accesso verificato.');
+  await loadSavedNetworks();
+  await loadLogs();
 }
 
 function detectLocation() {
@@ -155,7 +257,13 @@ async function sendConfiguration() {
     const ssid = $('ssid').value.trim();
     const pass = $('wifiPassword').value;
     if (!ssid) throw new Error('Inserisci il nome della rete Wi-Fi.');
-    if (state.latitude === null || state.longitude === null) throw new Error('Rileva prima la posizione GPS.');
+    if (!state.firstBoot) {
+      const result = await requestRobot('saveWifi', { pin: state.pin, ssid, pass });
+      showFeedback('feedback', result.message || 'Rete Wi-Fi salvata.');
+      await loadSavedNetworks();
+      return;
+    }
+    if (state.latitude === null || state.longitude === null) throw new Error('Al primo avvio rileva prima la posizione GPS.');
     const payload = {
       pin: state.pin,
       newPin: state.firstBoot ? $('newPin').value.trim() : '',
@@ -177,6 +285,10 @@ $('unlockButton').addEventListener('click', () => verifyAccess().catch((error) =
 $('locationButton').addEventListener('click', detectLocation);
 $('timeButton').addEventListener('click', syncTime);
 $('sendButton').addEventListener('click', sendConfiguration);
+$('scanWifiButton').addEventListener('click', scanWifi);
+$('retryWifiButton').addEventListener('click', retryWifi);
+$('refreshLogsButton').addEventListener('click', loadLogs);
+$('stopBleButton').addEventListener('click', stopBle);
 $('accessPanel').hidden = true;
 $('setupContent').hidden = true;
 syncTime();

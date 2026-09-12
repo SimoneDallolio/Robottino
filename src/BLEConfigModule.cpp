@@ -4,6 +4,7 @@
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
+#include <ArduinoJson.h>
 #include "Config.h"
 
 namespace {
@@ -21,6 +22,13 @@ namespace {
       }
 
       bool accepted = networkManagerApplyBlePayload(payload);
+      StaticJsonDocument<96> request;
+      deserializeJson(request, payload);
+      String action = request["action"] | "";
+      // Le richieste diagnostiche inviano gia una risposta JSON dettagliata
+      // dal gestore di rete; non sovrascriverla con la conferma generica.
+      if (action == "scanWifi" || action == "savedNetworks" || action == "logs" || action == "retryWifi" ||
+          action == "saveWifi" || action == "deleteWifi" || action == "stopBle") return;
       bleConfigNotify(accepted
         ? "{\"ok\":true,\"message\":\"configurazione salvata\"}"
         : String("{\"ok\":false,\"error\":\"") + networkManagerLastConfigError() + "\"}" );
@@ -64,25 +72,20 @@ void bleConfigBegin(const String& deviceName) {
   advertising->setScanResponse(true);
   advertising->start();
   active = true;
-  Serial.printf("[BLE] Advertising attivo: %s\n", deviceName.c_str());
-}
-
-void bleConfigLoop() {
+  networkManagerRecordLog(String("[BLE] Disponibile per la configurazione: ") + deviceName);
 }
 
 void bleConfigStop() {
   if (!active) return;
   BLEDevice::getAdvertising()->stop();
-  BLEDevice::deinit(true);
+  // Non rilasciare la memoria del controller: il BLE deve poter essere
+  // riavviato con la pressione prolungata senza riavviare l'ESP32.
+  BLEDevice::deinit(false);
   server = nullptr;
   configCharacteristic = nullptr;
   statusCharacteristic = nullptr;
   active = false;
-  Serial.println("[BLE] BLE disattivato");
-}
-
-bool bleConfigIsActive() {
-  return active;
+  networkManagerRecordLog("[BLE] Configurazione BLE disattivata");
 }
 
 void bleConfigNotify(const String& message) {

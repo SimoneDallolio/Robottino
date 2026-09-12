@@ -41,11 +41,18 @@
     <section class="setup-content" id="setupContent" hidden>
     <section class="panel">
       <div class="panel-heading"><span>02</span><h2>Rete Wi-Fi</h2></div>
-      <label for="ssid">SSID</label>
-      <input id="ssid" list="savedNetworks" placeholder="Nome della rete">
-      <datalist id="savedNetworks"></datalist>
+      <p class="hint">Cerca le reti vicine dal Robottino e selezionane una.</p>
+      <button class="button secondary" id="scanWifiButton">Cerca reti Wi-Fi vicine</button>
+      <div id="nearbyNetworks" class="network-list" aria-live="polite"></div>
+      <label for="ssid">Rete selezionata</label>
+      <input id="ssid" placeholder="Scegli una rete dall'elenco o inseriscila manualmente">
       <label for="wifiPassword">Password Wi-Fi</label>
       <input id="wifiPassword" type="password" placeholder="Password della rete">
+      <div class="saved-section">
+        <strong>Reti salvate nel Robottino</strong>
+        <div id="savedNetworks" class="network-list"></div>
+      </div>
+      <button class="button secondary" id="retryWifiButton">Riprova la connessione alle reti salvate</button>
     </section>
 
     <section class="panel split">
@@ -61,8 +68,17 @@
       </div>
     </section>
 
-    <button class="button primary" id="sendButton">Invia configurazione</button>
-    <p class="feedback" id="feedback" role="status"></p>
+    <div class="wifi-actions">
+      <button class="button primary" id="sendButton">Salva rete Wi-Fi sull'ESP</button>
+      <button class="button secondary" id="stopBleButton">Ho finito: disattiva BLE</button>
+    </div>
+
+    <section class="panel">
+      <div class="panel-heading"><span>05</span><h2>Messaggi del Robottino</h2></div>
+      <p class="hint">Gli ultimi messaggi di sistema aiutano a individuare errori di connessione.</p>
+      <button class="button secondary" id="refreshLogsButton">Aggiorna messaggi</button>
+      <pre id="serialLog" class="serial-log">Nessun messaggio ricevuto.</pre>
+    </section>
     </section>
     <p class="footer" id="appFooter" hidden>Servizio BLE: <code>7f7b0001-8b3a-4f65-9d39-2c8c5a7e1001</code></p>
   </main>

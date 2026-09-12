@@ -120,6 +120,7 @@ void loop() {
 
   if (isButtonHeldFor(3000)) {
     networkManagerStartBle();
+    networkManagerRecordLog("[INPUT] Pressione prolungata: BLE riattivato");
     lastActivityTime = millis();
   }
 

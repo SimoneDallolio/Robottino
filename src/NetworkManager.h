@@ -16,3 +16,4 @@ bool networkManagerApplyBlePayload(const String& payload);
 String networkManagerLastConfigError();
 String networkManagerProvisioningStatus();
 bool networkManagerGetLocation(float& latitude, float& longitude);
+void networkManagerRecordLog(const String& message);

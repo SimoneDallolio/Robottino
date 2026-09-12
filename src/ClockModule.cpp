@@ -32,6 +32,7 @@ static bool getWeatherForCoordinates(float latitude, float longitude) {
   weatherRequest.useHTTP10(true);
   if (!weatherRequest.begin(client, weatherUrl)) {
     Serial.println("[METEO] Errore apertura richiesta Open-Meteo");
+    networkManagerRecordLog("[METEO] Errore apertura richiesta Open-Meteo");
     return false;
   }
 
@@ -39,6 +40,7 @@ static bool getWeatherForCoordinates(float latitude, float longitude) {
   Serial.printf("[METEO] Open-Meteo HTTP status: %d\n", weatherStatus);
   if (weatherStatus != HTTP_CODE_OK) {
     Serial.printf("[METEO] Risposta meteo: %s\n", weatherRequest.errorToString(weatherStatus).c_str());
+    networkManagerRecordLog(String("[METEO] HTTP non valido: ") + String(weatherStatus));
     weatherRequest.end();
     return false;
   }
@@ -50,12 +52,14 @@ static bool getWeatherForCoordinates(float latitude, float longitude) {
   weatherRequest.end();
   if (weatherError) {
     Serial.printf("[METEO] Errore JSON meteo: %s\n", weatherError.c_str());
+    networkManagerRecordLog("[METEO] Errore lettura dati meteo");
     return false;
   }
 
   currentTemperature = weatherDocument["current"]["temperature_2m"].as<float>();
   if (isnan(currentTemperature)) {
     Serial.println("[METEO] Campo current.temperature_2m assente o non numerico");
+    networkManagerRecordLog("[METEO] Temperatura non presente nella risposta");
     return false;
   }
 
@@ -66,6 +70,7 @@ static bool getWeatherForCoordinates(float latitude, float longitude) {
 static bool syncTimeAndWeather() {
   if (!networkManagerConnectForSync()) {
     Serial.println("[NTP] Nessuna rete disponibile per il refresh");
+    networkManagerRecordLog("[NTP] Nessuna rete disponibile per l'aggiornamento");
     lastEcoSync = millis();
     return false;
   }
@@ -84,8 +89,10 @@ static bool syncTimeAndWeather() {
 
     if (syncAttempts < 10) {
       Serial.println("[NTP] Ora sincronizzata");
+      networkManagerRecordLog("[NTP] Ora sincronizzata");
     } else {
       Serial.println("[NTP] Sincronizzazione ora fallita");
+      networkManagerRecordLog("[NTP] Sincronizzazione ora fallita");
     }
 
     float latitude;
