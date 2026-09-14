@@ -11,6 +11,40 @@ const int leftEyeX = 34;
 const int rightEyeX = 70;
 const int eyeY = 14;
 
+enum AwakeGesture {
+  AWAKE_RESTING,
+  AWAKE_LOOKING,
+  AWAKE_BLINKING
+};
+
+static AwakeGesture awakeGesture = AWAKE_RESTING;
+static unsigned long gestureEndsAt = 0;
+static int lookOffsetX = 0;
+
+static unsigned long randomBetween(unsigned long minimum, unsigned long maximum) {
+  return minimum + random(maximum - minimum + 1);
+}
+
+void resetFaceAwakeAnimation() {
+  awakeGesture = AWAKE_RESTING;
+  lookOffsetX = 0;
+  gestureEndsAt = millis() + randomBetween(1200, 3500);
+}
+
+static void chooseNextAwakeGesture() {
+  unsigned long now = millis();
+
+  // Sguardi e battiti sono scelti senza una sequenza fissa.
+  if (random(100) < 55) {
+    awakeGesture = AWAKE_LOOKING;
+    lookOffsetX = random(2) == 0 ? -8 : 8;
+    gestureEndsAt = now + randomBetween(700, 1700);
+  } else {
+    awakeGesture = AWAKE_BLINKING;
+    gestureEndsAt = now + randomBetween(120, 190);
+  }
+}
+
 static void drawMouthAwake(Adafruit_SSD1306& display, int offsetX, int offsetY) {
   // La bocca segue solo in parte il movimento degli occhi per rendere il volto
   // piu naturale durante lo spostamento dello sguardo.
@@ -24,15 +58,27 @@ static void drawMouthAwake(Adafruit_SSD1306& display, int offsetX, int offsetY) 
 }
 
 void renderFaceAwake(Adafruit_SSD1306& display, int offsetX) {
-  // L'animazione si ripete ogni quattro secondi: prima lo sguardo si sposta,
-  // poi gli occhi si chiudono brevemente simulando un battito.
-  unsigned long now = millis() % 4000;
+  // Dopo pause di durata variabile, il robot sceglie casualmente uno sguardo
+  // laterale oppure un battito di ciglia.
+  unsigned long now = millis();
+  if (gestureEndsAt == 0) {
+    resetFaceAwakeAnimation();
+  } else if ((long)(now - gestureEndsAt) >= 0) {
+    if (awakeGesture == AWAKE_RESTING) {
+      chooseNextAwakeGesture();
+    } else {
+      awakeGesture = AWAKE_RESTING;
+      lookOffsetX = 0;
+      gestureEndsAt = now + randomBetween(1500, 5000);
+    }
+  }
+
   int eyeMoveX = 0;
   int currentEyeH = eyeHeight;
 
-  if (now > 1500 && now < 2500) {
-    eyeMoveX = -8;
-  } else if (now > 3500) {
+  if (awakeGesture == AWAKE_LOOKING) {
+    eyeMoveX = lookOffsetX;
+  } else if (awakeGesture == AWAKE_BLINKING) {
     currentEyeH = 2;
   }
 

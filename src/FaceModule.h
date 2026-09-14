@@ -4,6 +4,7 @@
 #include <Adafruit_SSD1306.h>
 #include "Config.h"
 
+void resetFaceAwakeAnimation();
 void renderFaceAwake(Adafruit_SSD1306& display, int offsetX = 0);
 void renderFaceFallingAsleep(Adafruit_SSD1306& display, unsigned long startTime, FaceState& currentState);
 void renderFaceSleeping(Adafruit_SSD1306& display);

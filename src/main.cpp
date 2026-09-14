@@ -2,6 +2,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <esp_system.h>
 
 #include "Config.h"
 #include "InputHandler.h"
@@ -112,6 +113,8 @@ void setup() {
 
   display.clearDisplay();
   display.display();
+  randomSeed(esp_random());
+  resetFaceAwakeAnimation();
   lastActivityTime = millis();
 }
 
@@ -142,6 +145,7 @@ void loop() {
     if (faceState == FACE_SLEEPING || faceState == FACE_FALLING_ASLEEP) {
       faceState = FACE_WAKING_UP;
       wakeAnimationStart = millis();
+      resetFaceAwakeAnimation();
       currentScreen = MODE_FACE;
     } else if (currentScreen == MODE_FACE) {
       currentScreen = MODE_CLOCK;
